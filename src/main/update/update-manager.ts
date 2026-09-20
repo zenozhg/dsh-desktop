@@ -23,10 +23,10 @@ import {
   writeSkippedVersion
 } from './skipped-version'
 import {
-  archiveFeedUrlForRuntime,
+  archiveFeedUrl,
   compareVersions,
   fetchAvailableReleases,
-  stableFeedUrlForRuntime
+  STABLE_FEED_URL
 } from './version-catalog'
 
 const { autoUpdater } = electronUpdater
@@ -199,7 +199,7 @@ export async function installSpecificVersion(version: unknown): Promise<UpdateSt
 
   selectedUpdateVersion = version
   pendingDowngrade = compareVersions(version, app.getVersion()) < 0
-  autoUpdater.setFeedURL({ provider: 'generic', url: archiveFeedUrlForRuntime(version) })
+  autoUpdater.setFeedURL({ provider: 'generic', url: archiveFeedUrl(version) })
   autoUpdater.allowDowngrade = true
   autoUpdater.allowPrerelease = isPrereleaseVersion(version)
   manualCheck = true
@@ -220,7 +220,7 @@ export async function installSpecificVersion(version: unknown): Promise<UpdateSt
     scheduleReset()
   } finally {
     checkPromise = undefined
-    autoUpdater.setFeedURL({ provider: 'generic', url: stableFeedUrlForRuntime() })
+    autoUpdater.setFeedURL({ provider: 'generic', url: STABLE_FEED_URL })
     autoUpdater.allowDowngrade = false
     pendingDowngrade = false
     autoUpdater.allowPrerelease = false

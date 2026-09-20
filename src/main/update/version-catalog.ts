@@ -3,34 +3,12 @@ import type { AvailableRelease } from '../../shared/contracts'
 export type { AvailableRelease }
 
 export const STABLE_FEED_URL = 'https://dshdesktop.com/updates/latest/'
-export const ARM64_STABLE_FEED_URL = 'https://dshdesktop.com/updates/latest-arm64/'
 export const VERSION_INDEX_URL = 'https://dshdesktop.com/updates/versions.json'
 
 const INDEX_TIMEOUT_MS = 8_000
 
 export function archiveFeedUrl(version: string): string {
   return `https://dshdesktop.com/updates/archive/${version}/`
-}
-
-export function arm64ArchiveFeedUrl(version: string): string {
-  return `https://dshdesktop.com/updates/archive-arm64/${version}/`
-}
-
-export function stableFeedUrlForRuntime(
-  osPlatform: NodeJS.Platform | string = process.platform,
-  osArch: NodeJS.Architecture | string = process.arch
-): string {
-  return osPlatform === 'win32' && osArch === 'arm64' ? ARM64_STABLE_FEED_URL : STABLE_FEED_URL
-}
-
-export function archiveFeedUrlForRuntime(
-  version: string,
-  osPlatform: NodeJS.Platform | string = process.platform,
-  osArch: NodeJS.Architecture | string = process.arch
-): string {
-  return osPlatform === 'win32' && osArch === 'arm64'
-    ? arm64ArchiveFeedUrl(version)
-    : archiveFeedUrl(version)
 }
 
 /** Split "1.2.3-rc.1" into ([1,2,3], "rc.1"). Non-numeric segments read as 0. */

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { compareVersions } from '../update/version-catalog'
 
 export const SERVICE_URL = 'https://dshdesktop.com/crash'
-export type DesktopPlatform = 'mac' | 'mac-intel' | 'windows' | 'windows-arm64'
+export type DesktopPlatform = 'mac' | 'mac-intel' | 'windows'
 export type FailureKind = 'startup-failure' | 'harness-crash' | 'renderer-crash' | 'gpu-crash' | 'main-crash' | 'unclean-exit'
 export type UpdateDecision = { updateAvailable: false } | { updateAvailable: true; version: string; feedUrl: string }
 type Request = (url: string, init?: RequestInit) => Promise<Response>
@@ -20,16 +20,10 @@ export function isPrereleaseVersion(value: string): boolean {
 export function desktopPlatform(platform: string, arch: string): DesktopPlatform {
   if (platform === 'darwin' && arch === 'arm64') return 'mac'
   if (platform === 'darwin' && arch === 'x64') return 'mac-intel'
-  if (platform === 'win32' && arch === 'x64') return 'windows'
-  if (platform === 'win32' && arch === 'arm64') return 'windows-arm64'
+  if (platform === 'win32' && (arch === 'x64' || arch === 'arm64')) return 'windows'
   throw new Error(`Unsupported desktop platform: ${platform}/${arch}`)
 }
 
-function expectedArchiveFeedUrl(platform: DesktopPlatform, version: string): string {
-  return platform === 'windows-arm64'
-    ? `https://dshdesktop.com/updates/archive-arm64/${version}/`
-    : `https://dshdesktop.com/updates/archive/${version}/`
-}
 export function redact(value: string): string {
   return value.replace(/(Bearer\s+)[^\s"',;]+/gi, '$1[REDACTED]')
     .replace(/(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|token)["']?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^\s,;}]+)/gi, '$1[REDACTED]')
@@ -168,7 +162,7 @@ export class DesktopService {
     if (!response.ok) throw new Error(`Update policy unavailable (${response.status})`)
     const policy = await response.json() as Record<string, unknown>
     if (policy?.updateAvailable === false) return { updateAvailable: false }
-    if (policy?.updateAvailable !== true || !isVersion(policy.version) || compareVersions(policy.version.split('+')[0]!, this.options.version.split('+')[0]!) <= 0 || (!isPrereleaseVersion(this.options.version) && isPrereleaseVersion(policy.version)) || policy.feedUrl !== expectedArchiveFeedUrl(this.platform, policy.version)) throw new Error('Invalid update policy')
+    if (policy?.updateAvailable !== true || !isVersion(policy.version) || compareVersions(policy.version.split('+')[0]!, this.options.version.split('+')[0]!) <= 0 || (!isPrereleaseVersion(this.options.version) && isPrereleaseVersion(policy.version)) || policy.feedUrl !== `https://dshdesktop.com/updates/archive/${policy.version}/`) throw new Error('Invalid update policy')
     return { updateAvailable: true, version: policy.version, feedUrl: policy.feedUrl as string }
   }
 }
