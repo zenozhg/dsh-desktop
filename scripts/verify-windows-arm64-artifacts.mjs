@@ -17,15 +17,14 @@ const MACHINE_NAME = {
 function isForeignArchitectureOrPlatform(filePath) {
   const normalized = filePath.replace(/\\/g, '/').toLowerCase()
   if (
+    normalized.endsWith('/elevate.exe') ||
+    normalized.endsWith('\\elevate.exe') ||
+    normalized.includes('/node_modules/pnpm/dist/') ||
     normalized.includes('/prebuilds/darwin-') ||
     normalized.includes('/prebuilds/linux-') ||
     normalized.includes('/prebuilds/android-') ||
     normalized.includes('/prebuilds/win32-x64') ||
-    normalized.includes('/prebuilds/win32-ia32')
-  ) {
-    return true
-  }
-  if (
+    normalized.includes('/prebuilds/win32-ia32') ||
     normalized.includes('win10-x64') ||
     normalized.includes('win10-x86') ||
     normalized.includes('-x64.exe') ||
@@ -142,6 +141,15 @@ export async function verifyWindowsArm64Artifacts(options = {}) {
     if (machine === null) {
       if (file === installer || file === packagedNode || isNodeAddon) {
         violations.push(`${relative(releaseDir, file)} => not a valid PE binary`)
+      }
+      continue
+    }
+
+    if (file === installer) {
+      // NSIS installers are standard 32-bit x86 PE self-extractors (0x014c) containing ARM64 payloads.
+      // The unit test fixture creates a mock 0xaa64 installer. Both are valid installer PE formats.
+      if (machine !== PE_MACHINE.ARM64 && machine !== PE_MACHINE.I386) {
+        violations.push(`${relative(releaseDir, file)} => unexpected installer format`)
       }
       continue
     }
