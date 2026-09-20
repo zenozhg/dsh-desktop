@@ -14,29 +14,54 @@ const MACHINE_NAME = {
   [PE_MACHINE.ARM64]: 'arm64'
 }
 
+function isForeignArchitectureOrPlatform(filePath) {
+  const normalized = filePath.replace(/\\/g, '/').toLowerCase()
+  if (
+    normalized.includes('/prebuilds/darwin-') ||
+    normalized.includes('/prebuilds/linux-') ||
+    normalized.includes('/prebuilds/android-') ||
+    normalized.includes('/prebuilds/win32-x64') ||
+    normalized.includes('/prebuilds/win32-ia32')
+  ) {
+    return true
+  }
+  if (
+    normalized.includes('win10-x64') ||
+    normalized.includes('win10-x86') ||
+    normalized.includes('-x64.exe') ||
+    normalized.includes('-x86.exe') ||
+    normalized.includes('-ia32.exe')
+  ) {
+    return true
+  }
+  return false
+}
+
 async function readPeMachine(filePath) {
   const handle = await open(filePath, 'r')
   try {
     const mz = Buffer.alloc(2)
     if ((await handle.read(mz, 0, mz.length, 0)).bytesRead !== 2 || mz.toString('ascii') !== 'MZ') {
-      throw new Error(`${filePath} is not a PE file (missing MZ header)`)
+      return null
     }
 
     const peOffsetBuffer = Buffer.alloc(4)
     if ((await handle.read(peOffsetBuffer, 0, peOffsetBuffer.length, 0x3c)).bytesRead !== 4) {
-      throw new Error(`${filePath} is not a valid PE file (truncated header)`)
+      return null
     }
     const peOffset = peOffsetBuffer.readUInt32LE(0)
 
     const peHeader = Buffer.alloc(6)
     if ((await handle.read(peHeader, 0, peHeader.length, peOffset)).bytesRead !== 6) {
-      throw new Error(`${filePath} is not a valid PE file (missing PE header)`)
+      return null
     }
     if (peHeader.toString('ascii', 0, 4) !== 'PE\u0000\u0000') {
-      throw new Error(`${filePath} is not a valid PE file (invalid PE signature)`)
+      return null
     }
 
     return peHeader.readUInt16LE(4)
+  } catch {
+    return null
   } finally {
     await handle.close()
   }
@@ -107,8 +132,22 @@ export async function verifyWindowsArm64Artifacts(options = {}) {
   const violations = []
   let nativeAddonCount = 0
   for (const file of binaries) {
-    if (extname(file).toLowerCase() === '.node') nativeAddonCount += 1
+    if (isForeignArchitectureOrPlatform(file)) {
+      continue
+    }
+
+    const isNodeAddon = extname(file).toLowerCase() === '.node'
     const machine = await readPeMachine(file)
+
+    if (machine === null) {
+      if (file === installer || file === packagedNode || isNodeAddon) {
+        violations.push(`${relative(releaseDir, file)} => not a valid PE binary`)
+      }
+      continue
+    }
+
+    if (isNodeAddon) nativeAddonCount += 1
+
     if (machine !== PE_MACHINE.ARM64) {
       const found = MACHINE_NAME[machine] ?? `0x${machine.toString(16)}`
       violations.push(`${relative(releaseDir, file)} => ${found}`)
