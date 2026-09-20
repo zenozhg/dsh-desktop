@@ -78,5 +78,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Triggering Windows ARM64 build workflow..."
-          gh workflow run build-windows-arm64.yml --ref main || echo "Trigger dispatched or pending."
+          echo "Triggering Windows ARM64 build workflow on $GITHUB_REPOSITORY..."
+          gh workflow run build-windows-arm64.yml --repo "$GITHUB_REPOSITORY" --ref main || echo "Trigger dispatched or pending."
