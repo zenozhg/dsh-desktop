@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   actions: write
-  issues: write
 
 jobs:
   sync:
@@ -41,19 +40,20 @@ jobs:
       - name: Merge Upstream Main
         id: merge_step
         run: |
-          git checkout main
-          LOCAL_SHA=$(git rev-parse HEAD)
-          UPSTREAM_SHA=$(git rev-parse upstream/main)
-          echo "Local SHA: $LOCAL_SHA"
-          echo "Upstream SHA: $UPSTREAM_SHA"
+          git checkout -B main origin/main
+          UPSTREAM_HEAD=$(git rev-parse upstream/main)
+          MERGE_BASE=$(git merge-base upstream/main HEAD)
+          echo "Upstream HEAD: $UPSTREAM_HEAD"
+          echo "Merge base:    $MERGE_BASE"
 
-          if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
-            echo "Already up to date with upstream."
+          if [ "$UPSTREAM_HEAD" = "$MERGE_BASE" ]; then
+            echo "Already up to date with upstream main."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
+            echo "New commits detected on upstream main. Merging..."
             if git merge upstream/main -m "chore: sync upstream changes"; then
               echo "Merge successful."
-              git push origin main
+              git push origin HEAD:refs/heads/main
               echo "has_changes=true" >> "$GITHUB_OUTPUT"
             else
               echo "::error::Merge conflict encountered while syncing upstream!"
@@ -64,8 +64,8 @@ jobs:
       - name: Push Upstream Tags
         id: tags_step
         run: |
-          # 同步上游的所有 Tag（如 v0.9.0 等）
-          TAG_OUTPUT=$(git push origin --tags 2>&1 || true)
+          # 同步上游的所有 Tag（如 v0.9.1 等）
+          TAG_OUTPUT=$(git push origin 'refs/tags/*:refs/tags/*' 2>&1 || true)
           echo "$TAG_OUTPUT"
           if echo "$TAG_OUTPUT" | grep -E "new tag|new ref"; then
             echo "new_tags=true" >> "$GITHUB_OUTPUT"
@@ -80,12 +80,3 @@ jobs:
         run: |
           echo "Triggering Windows ARM64 build workflow..."
           gh workflow run build-windows-arm64.yml --ref main || echo "Trigger dispatched or pending."
-
-      - name: Notify on Conflict Failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue create \
-            --title "🚨 上游代码同步发生冲突 / Upstream Sync Conflict" \
-            --body "自动同步上游 \`dataelement/dsh-desktop\` 时遇到合并冲突，请手动拉取并解决冲突后推送。" || true
