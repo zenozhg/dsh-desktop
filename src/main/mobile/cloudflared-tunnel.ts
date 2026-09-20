@@ -76,6 +76,13 @@ export function resolveCurrentAssetSpec(
   return spec ? { key, spec } : null
 }
 
+function cloudflaredUnsupportedError(osPlatform: NodeJS.Platform | string, osArch: NodeJS.Architecture | string): string {
+  if (osPlatform === 'win32' && osArch === 'arm64') {
+    return 'cloudflared does not currently publish a verified win32-arm64 binary for this pinned version. Configure a trusted custom cloudflared path in settings or disable tunnel mode on Windows ARM64.'
+  }
+  return `Unsupported platform/architecture for cloudflared: ${osPlatform}-${osArch}`
+}
+
 export async function sha256OfFile(path: string): Promise<string> {
   const hash = createHash('sha256')
   await new Promise<void>((resolve, reject) => {
@@ -105,7 +112,7 @@ export async function ensureCloudflaredBinary(options: {
 
   const target = resolveCurrentAssetSpec(options.osPlatform, options.osArch)
   if (!target) {
-    throw new Error(`Unsupported platform/architecture for cloudflared: ${options.osPlatform ?? platform()}-${options.osArch ?? arch()}`)
+    throw new Error(cloudflaredUnsupportedError(options.osPlatform ?? platform(), options.osArch ?? arch()))
   }
 
   const binaryName = (options.osPlatform ?? platform()) === 'win32' ? 'cloudflared.exe' : 'cloudflared'

@@ -37,10 +37,12 @@
     "package:dev:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build && electron-builder --mac --arm64 --publish never --config electron-builder.dev.cjs",
     "package:dev:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build && electron-builder --mac --x64 --publish never --config electron-builder.dev.cjs",
     "package:dev:win": "node scripts/verify-target.mjs win32 x64 && npm run build && electron-builder --win --x64 --publish never --config electron-builder.dev.cjs",
+    "package:dev:win:arm64": "node scripts/verify-target.mjs win32 arm64 && npm run build && electron-builder --win --arm64 --publish never --config electron-builder.dev.cjs",
     "package:mac": "npm run build && electron-builder --mac --publish never",
     "package:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build && electron-builder --mac --arm64 --publish never",
     "package:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build && electron-builder --mac --x64 --publish never",
     "package:win": "node scripts/verify-target.mjs win32 x64 && npm run build && electron-builder --win --x64 --publish never",
+    "package:win:arm64": "node scripts/verify-target.mjs win32 arm64 && npm run build && electron-builder --win --arm64 --publish never",
     "ppt:build": "node scripts/generate-zara-ppt-templates.mjs && node scripts/localize-ppt-templates.mjs && node scripts/enrich-ppt-templates.mjs && node scripts/build-ppt-runtime.mjs"
   },
   "dependencies": {
@@ -440,7 +442,8 @@
         {
           "target": "nsis",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         }
       ]

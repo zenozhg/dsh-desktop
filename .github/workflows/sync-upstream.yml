@@ -1,0 +1,91 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # 每天 UTC 0:00 与 12:00（北京时间 8:00 与 20:00）自动运行
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:
+    inputs:
+      trigger_build:
+        description: '同步完成后是否触发 Windows ARM64 编译'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  sync:
+    name: Sync Upstream & Tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add & Fetch Upstream
+        run: |
+          git remote add upstream https://github.com/dataelement/dsh-desktop.git
+          git fetch upstream main --tags
+
+      - name: Merge Upstream Main
+        id: merge_step
+        run: |
+          git checkout main
+          LOCAL_SHA=$(git rev-parse HEAD)
+          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          echo "Local SHA: $LOCAL_SHA"
+          echo "Upstream SHA: $UPSTREAM_SHA"
+
+          if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
+            echo "Already up to date with upstream."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            if git merge upstream/main -m "chore: sync upstream changes"; then
+              echo "Merge successful."
+              git push origin main
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Merge conflict encountered while syncing upstream!"
+              exit 1
+            fi
+          fi
+
+      - name: Push Upstream Tags
+        id: tags_step
+        run: |
+          # 同步上游的所有 Tag（如 v0.9.0 等）
+          TAG_OUTPUT=$(git push origin --tags 2>&1 || true)
+          echo "$TAG_OUTPUT"
+          if echo "$TAG_OUTPUT" | grep -E "new tag|new ref"; then
+            echo "new_tags=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "new_tags=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger ARM64 Build Workflow
+        if: ${{ inputs.trigger_build || steps.merge_step.outputs.has_changes == 'true' || steps.tags_step.outputs.new_tags == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering Windows ARM64 build workflow..."
+          gh workflow run build-windows-arm64.yml --ref main || echo "Trigger dispatched or pending."
+
+      - name: Notify on Conflict Failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🚨 上游代码同步发生冲突 / Upstream Sync Conflict" \
+            --body "自动同步上游 \`dataelement/dsh-desktop\` 时遇到合并冲突，请手动拉取并解决冲突后推送。" || true

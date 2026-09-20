@@ -1,0 +1,87 @@
+name: Build Windows ARM64
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '*-beta*'
+      - '*-rc*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '指定构建版本号（如 v0.9.0，留空则取当前分支/Tag版本）'
+        required: false
+        default: ''
+      publish_release:
+        description: '是否发布/附加到 GitHub Releases'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-arm64:
+    name: Build & Package (Windows 11 ARM64)
+    runs-on: windows-11-arm
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set App Version
+        shell: bash
+        run: |
+          TARGET_VERSION="${{ inputs.version }}"
+          if [ -z "$TARGET_VERSION" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TARGET_VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          if [ -n "$TARGET_VERSION" ]; then
+            echo "Setting app version to: $TARGET_VERSION"
+            npm version --no-git-tag-version --allow-same-version "$TARGET_VERSION"
+          fi
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm test
+
+      - name: Run Typecheck
+        run: npm run typecheck
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Package Windows ARM64 NSIS Installer
+        run: npm run package:win:arm64
+
+      - name: Verify ARM64 PE Binaries
+        run: node scripts/verify-windows-arm64-artifacts.mjs dist
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-windows-arm64
+          path: |
+            dist/*windows-arm64*.exe
+            dist/*windows-arm64*.exe.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        if: ${{ inputs.publish_release || startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version != '' && inputs.version || github.ref_name }}
+          files: |
+            dist/*windows-arm64*.exe
+            dist/*windows-arm64*.exe.blockmap
