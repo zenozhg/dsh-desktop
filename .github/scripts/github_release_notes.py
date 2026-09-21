@@ -150,14 +150,11 @@ def generate_fallback(tag: str) -> str:
 
     sections = [
         f"{title_prefix(tag)}版本更新",
+        "",
+        "## 更新内容",
+        "",
+        bullets(feats or others or ["各项功能优化与体验改进"]),
     ]
-    if feats or (not fixes and not perfs):
-        sections += [
-            "",
-            "## 更新内容",
-            "",
-            bullets(feats or others or ["各项功能优化与体验改进"]),
-        ]
     if fixes:
         sections += ["", "## 问题修复", "", bullets(fixes)]
     if perfs:
